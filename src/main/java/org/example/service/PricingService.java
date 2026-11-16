@@ -7,6 +7,8 @@ import org.example.model.Shipment;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import org.example.model.PricingResult;
+import org.example.model.FuelType;
 
 public class PricingService {
 
@@ -111,4 +113,114 @@ public class PricingService {
                 .multiply(vatRate)
                 .setScale(2, RoundingMode.HALF_UP);
     }
+
+
+    public PricingResult calculate(Shipment shipment) {
+        BigDecimal netFuelPrice = calculateNetFuelPrice(shipment);
+
+        BigDecimal logisticsCost = calculateLogisticsCost(shipment);
+
+        BigDecimal excise = calculateExcise(shipment);
+
+        BigDecimal vat = calculateVat(
+                shipment,
+                netFuelPrice,
+                logisticsCost,
+                excise
+        );
+
+        BigDecimal totalTax = excise
+                .add(vat)
+                .setScale(2, RoundingMode.HALF_UP);
+
+        BigDecimal grandTotal = netFuelPrice
+                .add(logisticsCost)
+                .add(totalTax)
+                .setScale(2, RoundingMode.HALF_UP);
+
+        return new PricingResult(
+                shipment.getId(),
+                netFuelPrice,
+                logisticsCost,
+                totalTax,
+                grandTotal
+        );
+    }
+    public BigDecimal calculateExcise(
+            Shipment shipment,
+            BigDecimal customGasolineExcise
+    ) {
+        if (shipment.getType() == FuelType.GASOLINE) {
+            return shipment.getVolume()
+                    .multiply(customGasolineExcise)
+                    .setScale(2, RoundingMode.HALF_UP);
+        }
+
+        return calculateExcise(shipment);
+    }
+
+    public BigDecimal calculateVat(
+            Shipment shipment,
+            BigDecimal netFuelPrice,
+            BigDecimal logisticsCost,
+            BigDecimal excise,
+            BigDecimal customVatPercent
+    ) {
+        if (shipment.getClient() == ClientType.EXEMPT) {
+            return BigDecimal.ZERO.setScale(2);
+        }
+
+        BigDecimal vatRate = customVatPercent.movePointLeft(2);
+
+        BigDecimal vatBase = netFuelPrice
+                .add(logisticsCost)
+                .add(excise);
+
+        return vatBase
+                .multiply(vatRate)
+                .setScale(2, RoundingMode.HALF_UP);
+    }
+
+
+    public PricingResult calculate(
+            Shipment shipment,
+            BigDecimal customVatPercent,
+            BigDecimal customGasolineExcise
+    ) {
+        BigDecimal netFuelPrice = calculateNetFuelPrice(shipment);
+
+        BigDecimal logisticsCost = calculateLogisticsCost(shipment);
+
+        BigDecimal excise = calculateExcise(
+                shipment,
+                customGasolineExcise
+        );
+
+        BigDecimal vat = calculateVat(
+                shipment,
+                netFuelPrice,
+                logisticsCost,
+                excise,
+                customVatPercent
+        );
+
+        BigDecimal totalTax = excise
+                .add(vat)
+                .setScale(2, RoundingMode.HALF_UP);
+
+        BigDecimal grandTotal = netFuelPrice
+                .add(logisticsCost)
+                .add(totalTax)
+                .setScale(2, RoundingMode.HALF_UP);
+
+        return new PricingResult(
+                shipment.getId(),
+                netFuelPrice,
+                logisticsCost,
+                totalTax,
+                grandTotal
+        );
+    }
+
+
 }
